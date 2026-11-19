@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14532d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scores">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Scores</title>
+<style>
+  :root {
+    --felt: #14532d;
+    --felt-2: #166534;
+    --bg: #f4f1ea;
+    --card: #ffffff;
+    --ink: #1c1917;
+    --muted: #78716c;
+    --line: #e7e5e4;
+    --good: #15803d;
+    --bad: #b91c1c;
+    --gold: #ca8a04;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0a09;
+      --card: #1c1917;
+      --ink: #f5f5f4;
+      --muted: #a8a29e;
+      --line: #292524;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--felt); color: #fff; padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
+    display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 19px; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header button { background: rgba(255,255,255,.15); color: #fff; border: 0; border-radius: 8px;
+    padding: 7px 12px; font-size: 15px; }
+  main { padding: 14px 14px calc(env(safe-area-inset-bottom) + 40px); max-width: 640px; margin: 0 auto; }
+  .card { background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 14px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+  button { font: inherit; cursor: pointer; }
+  .btn { display: block; width: 100%; border: 0; border-radius: 12px; padding: 14px; font-size: 17px;
+    font-weight: 600; background: var(--felt-2); color: #fff; }
+  .btn:disabled { opacity: .4; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
+  .btn.danger { background: transparent; color: var(--bad); border: 1px solid var(--line); font-weight: 500; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: 0; }
+  .grow { flex: 1; min-width: 0; }
+  .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .total { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
+  .leader .name::after { content: " \1F451"; }
+  input[type=text] { font: inherit; width: 100%; padding: 11px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .num { font: inherit; font-size: 20px; width: 84px; text-align: center; padding: 8px 4px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .sign { width: 40px; height: 42px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg);
+    color: var(--ink); font-size: 20px; }
+  .sign.neg { background: var(--bad); color: #fff; border-color: var(--bad); }
+  .stepper { display: flex; align-items: center; gap: 6px; }
+  .stepper button { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); font-size: 22px; line-height: 1; }
+  .stepper .val { font-size: 22px; font-weight: 700; min-width: 30px; text-align: center; font-variant-numeric: tabular-nums; }
+  .seg { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button { flex: 1; border: 0; background: transparent; color: var(--ink); padding: 9px; border-radius: 8px; font-weight: 500; }
+  .seg button.on { background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.15); font-weight: 700; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+  .toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .toggle input { width: 22px; height: 22px; accent-color: var(--felt-2); }
+  .x { border: 0; background: transparent; color: var(--muted); font-size: 22px; padding: 0 6px; }
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 99px; background: var(--bg); font-size: 13px; font-weight: 600; }
+  .roundinfo { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .trump { font-size: 15px; }
+  .red { color: #dc2626; }
+  .warn { color: var(--bad); font-size: 14px; margin: 8px 0 0; }
+  .ok { color: var(--good); }
+  .gap { height: 10px; }
+  .hist { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .hist th, .hist td { padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--line); }
+  .hist th { color: var(--muted); font-weight: 600; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist td:first-child, .hist th:first-child { text-align: left; color: var(--muted); }
+  .scroll { overflow-x: auto; }
+  .made { color: var(--good); font-weight: 700; }
+  .miss { color: var(--muted); }
+  .gamelist .row { cursor: pointer; }
+  .empty { text-align: center; color: var(--muted); padding: 30px 10px; }
+  .sheet { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 10; display: flex; align-items: flex-end; }
+  .sheet-in { background: var(--card); width: 100%; max-width: 640px; margin: 0 auto; border-radius: 18px 18px 0 0;
+    padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px); display: grid; gap: 10px; }
+  .chip { border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 99px; padding: 5px 11px; font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <button id="back" hidden>&larr;</button>
+  <h1 id="title">Scores</h1>
+  <button id="action" hidden></button>
+</header>
+<main id="app"></main>
+
+<script>
+/* Scores: a tiny card game scorekeeper. All data lives in localStorage on this device. */
+
+const KEY = 'scores.v1';
+const SUITS = [
+  { s: '♥', n: 'Hearts', red: true },
+  { s: '♣', n: 'Clubs', red: false },
+  { s: '♦', n: 'Diamonds', red: true },
+  { s: '♠', n: 'Spades', red: false },
+];
+const NO_TRUMP = { s: 'NT', n: 'No trump', red: false };
+
+let db = load();
+let view = { name: 'home' };   // home | new | game
+let draft = null;              // new game form state, or in-round entry state
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || { games: [] }; }
+  catch { return { games: [] }; }
+}
+function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function game() { return db.games.find(g => g.id === view.id); }
+const $ = id => document.getElementById(id);
+
+/* ---------- Blob rules ---------- */
+
+// Cards dealt each round, e.g. 7,6,5,4,3,2,1,2,3,4,5,6,7
+function blobSchedule(st) {
+  const down = [];
+  for (let c = st.startCards; c >= 1; c--) down.push(c);
+  if (st.direction === 'up') return down.slice().reverse();
+  if (st.direction === 'down') return down;
+  return down.concat(down.slice(0, -1).reverse());
+}
+function blobTrump(st, i) {
+  if (!st.trumps) return null;
+  const list = st.noTrump ? SUITS.concat([NO_TRUMP]) : SUITS;
+  return list[i % list.length];
+}
+function blobPoints(st, bid, tricks) {
+  if (bid !== tricks) return 0;
+  return st.bonus + (st.zeroScoresBonusOnly && bid === 0 ? 0 : bid);
+}
+// Seat order for a round, starting left of the dealer; the dealer bids last
+function bidOrder(n, dealer) {
+  const order = [];
+  for (let k = 1; k <= n; k++) order.push((dealer + k) % n);
+  return order;
+}
+
+/* ---------- Totals ---------- */
+
+function totals(g) {
+  const t = g.players.map(() => 0);
+  for (const r of g.rounds) r.points.forEach((p, i) => t[i] += p);
+  return t;
+}
+function leaders(g, t) {
+  if (!g.rounds.length) return [];
+  const best = g.lowWins ? Math.min(...t) : Math.max(...t);
+  return t.map((v, i) => v === best ? i : -1).filter(i => i >= 0);
+}
+
+/* ---------- Header ---------- */
+
+function setHeader(title, back, action, onAction) {
+  $('title').textContent = title;
+  $('back').hidden = !back;
+  $('back').onclick = back || null;
+  $('action').hidden = !action;
+  $('action').textContent = action || '';
+  $('action').onclick = onAction || null;
+}
+
+/* ---------- Views ---------- */
+
+function render() {
+  if (view.name === 'home') renderHome();
+  else if (view.name === 'new') renderNew();
+  else if (view.name === 'game') game() ? renderGame() : go({ name: 'home' });
+}
+function go(v) { view = v; draft = null; render(); window.scrollTo(0, 0); }
+
+function renderHome() {
+  setHeader('Scores', null, '+ New', () => go({ name: 'new' }));
+  const games = db.games.slice().sort((a, b) => b.updated - a.updated);
+  $('app').innerHTML = games.length ? `
+    <div class="card gamelist">
+      ${games.map(g => {
+        const t = totals(g), l = leaders(g, t);
+        const lead = l.length ? g.players[l[0]] + ' leads' : 'Not started';
+        return `<div class="row" data-id="${g.id}">
+          <div class="grow"><div class="name">${esc(g.name)}</div>
+          <div class="sub">${g.type === 'blob' ? 'Blob' : 'Simple'} &middot; ${g.players.length} players &middot; ${esc(lead)}${g.finished ? ' &middot; done' : ''}</div></div>
+          <div class="sub">${new Date(g.updated).toLocaleDateString()}</div></div>`;
+      }).join('')}
+    </div>` : `<div class="empty">No games yet.<div class="gap"></div><button class="btn" id="start">Start a game</button></div>`;
+  document.querySelectorAll('.gamelist .row').forEach(el => el.onclick = () => go({ name: 'game', id: el.dataset.id }));
+  if ($('start')) $('start').onclick = () => go({ name: 'new' });
+}
+
+function lastPlayers() {
+  const g = db.games.slice().sort((a, b) => b.updated - a.updated)[0];
+  return g ? g.players.slice() : ['', ''];
+}
+
+function renderNew() {
+  setHeader('New game', () => go({ name: 'home' }));
+  if (!draft) draft = {
+    type: 'simple', name: '', players: lastPlayers(), lowWins: false,
+    blob: { startCards: 7, direction: 'both', bonus: 10, hook: true, trumps: true, noTrump: false, zeroScoresBonusOnly: false },
+  };
+  const d = draft;
+  const n = d.players.filter(p => p.trim()).length;
+  const maxCards = Math.max(1, Math.floor(52 / Math.max(n, 1)));
+  if (d.blob.startCards > maxCards) d.blob.startCards = maxCards;
+
+  $('app').innerHTML = `
+    <div class="card">
+      <div class="field"><label>Game</label>
+        <div class="seg"><button data-type="simple" class="${d.type === 'simple' ? 'on' : ''}">Simple tally</button>
+        <button data-type="blob" class="${d.type === 'blob' ? 'on' : ''}">Blob</button></div></div>
+      <div class="field"><label>Name (optional)</label>
+        <input type="text" id="gname" placeholder="${d.type === 'blob' ? 'Blob' : 'Game'} night" value="${esc(d.name)}"></div>
+    </div>
+    <div class="card"><h2>Players${d.type === 'blob' ? ' (in seating order)' : ''}</h2>
+      <div id="plist">${d.players.map((p, i) => `
+        <div class="row"><input type="text" data-i="${i}" placeholder="Player ${i + 1}" value="${esc(p)}" autocapitalize="words">
+        <button class="x" data-del="${i}">&times;</button></div>`).join('')}</div>
+      <div class="gap"></div><button class="btn ghost" id="addp">+ Add player</button>
+    </div>
+    ${d.type === 'simple' ? `
+    <div class="card"><h2>Options</h2>
+      <div class="toggle"><span>Lowest score wins</span><input type="checkbox" id="low" ${d.lowWins ? 'checked' : ''}></div>
+    </div>` : `
+    <div class="card"><h2>Blob rules</h2>
+      <div class="toggle"><span>Starting cards <span class="sub">(max ${maxCards})</span></span>
+        <div class="stepper"><button data-sc="-1">&minus;</button><span class="val">${d.blob.startCards}</span><button data-sc="1">+</button></div></div>
+      <div class="field" style="margin-top:12px"><label>Rounds</label>
+        <div class="seg">
+          <button data-dir="both" class="${d.blob.direction === 'both' ? 'on' : ''}">Down &amp; up</button>
+          <button data-dir="down" class="${d.blob.direction === 'down' ? 'on' : ''}">Down only</button>
+          <button data-dir="up" class="${d.blob.direction === 'up' ? 'on' : ''}">Up only</button></div>
+        <div class="sub" style="margin-top:6px">${blobSchedule(d.blob).join(', ')} (${blobSchedule(d.blob).length} rounds)</div></div>
+      <div class="toggle"><span>Bonus for making your bid</span>
+        <div class="stepper"><button data-bonus="-1">&minus;</button><span class="val">${d.blob.bonus}</span><button data-bonus="1">+</button></div></div>
+      <div class="sub" style="padding:6px 0 4px">Make it: ${d.blob.bonus} + tricks bid. Miss it: 0.</div>
+      <div class="toggle"><span>Bid 0 and make it scores bonus only</span><input type="checkbox" id="zbo" ${d.blob.zeroScoresBonusOnly ? 'checked' : ''}></div>
+      <div class="toggle"><span>Dealer can't make bids add up</span><input type="checkbox" id="hook" ${d.blob.hook ? 'checked' : ''}></div>
+      <div class="toggle"><span>Rotate trumps</span><input type="checkbox" id="trumps" ${d.blob.trumps ? 'checked' : ''}></div>
+      ${d.blob.trumps ? `<div class="toggle"><span>Include a no trump round</span><input type="checkbox" id="nt" ${d.blob.noTrump ? 'checked' : ''}></div>` : ''}
+    </div>`}
+    <button class="btn" id="go" ${n < 2 ? 'disabled' : ''}>Start game</button>`;
+
+  document.querySelectorAll('[data-type]').forEach(b => b.onclick = () => { d.type = b.dataset.type; renderNew(); });
+  $('gname').oninput = e => d.name = e.target.value;
+  document.querySelectorAll('#plist input').forEach(inp => inp.oninput = e => {
+    d.players[+e.target.dataset.i] = e.target.value;
+    const ok = d.players.filter(p => p.trim()).length >= 2;
+    $('go').disabled = !ok;
+  });
+  document.querySelectorAll('#plist input').forEach(inp => inp.onchange = () => { if (d.type === 'blob') renderNew(); });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { d.players.splice(+b.dataset.del, 1); renderNew(); });
+  $('addp').onclick = () => { d.players.push(''); renderNew(); document.querySelector(`#plist input[data-i="${d.players.length - 1}"]`).focus(); };
+  if ($('low')) $('low').onchange = e => d.lowWins = e.target.checked;
+  document.querySelectorAll('[data-sc]').forEach(b => b.onclick = () => {
+    d.blob.startCards = Math.min(maxCards, Math.max(1, d.blob.startCards + +b.dataset.sc)); renderNew(); });
+  document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => { d.blob.direction = b.dataset.dir; renderNew(); });
+  document.querySelectorAll('[data-bonus]').forEach(b => b.onclick = () => {
+    d.blob.bonus = Math.max(0, d.blob.bonus + +b.dataset.bonus); renderNew(); });
+  for (const [id, k] of [['zbo', 'zeroScoresBonusOnly'], ['hook', 'hook'], ['trumps', 'trumps'], ['nt', 'noTrump']])
+    if ($(id)) $(id).onchange = e => { d.blob[k] = e.target.checked; renderNew(); };
+
+  $('go').onclick = () => {
+    const players = d.players.map(p => p.trim()).filter(Boolean);
+    if (players.length < 2) return;
+    const g = {
+      id: uid(), type: d.type, name: d.name.trim() || (d.type === 'blob' ? 'Blob' : 'Game') + ' ' + new Date().toLocaleDateString(),
+      players, rounds: [], lowWins: d.type === 'simple' ? d.lowWins : false, created: Date.now(), updated: Date.now(),
+    };
+    if (d.type === 'blob') { g.settings = { ...d.blob }; g.firstDealer = 0; }
+    db.games.push(g); save();
+    go({ name: 'game', id: g.id });
+  };
+}
+
+function scoreboard(g) {
+  const t = totals(g), l = leaders(g, t);
+  const last = g.rounds[g.rounds.length - 1];
+  return `<div class="card"><h2>Totals${g.rounds.length ? ' after round ' + g.rounds.length : ''}</h2>
+    ${g.players.map((p, i) => `<div class="row ${l.includes(i) ? 'leader' : ''}">
+      <div class="grow"><div class="name">${esc(p)}</div>
+      ${last ? `<div class="sub">last round ${last.points[i] >= 0 ? '+' : ''}${last.points[i]}</div>` : ''}</div>
+      <div class="total">${t[i]}</div></div>`).join('')}</div>`;
+}
+
+function renderGame() {
+  const g = game();
+  setHeader(g.name, () => go({ name: 'home' }), 'Menu', () => gameMenu(g));
+  if (g.type === 'blob') renderBlob(g); else renderSimple(g);
+}
+
+function gameMenu(g) {
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  sheet.innerHTML = `<div class="sheet-in">
+    <button class="btn ghost" data-m="1" ${g.rounds.length ? '' : 'disabled'}>Undo last round</button>
+    <button class="btn ghost" data-m="2">Rename game</button>
+    <button class="btn ghost" data-m="3">Play again, same players</button>
+    <button class="btn danger" data-m="4">Delete game</button>
+    <button class="btn" data-m="0">Close</button></div>`;
+  document.body.appendChild(sheet);
+  sheet.onclick = e => {
+    const b = e.target.closest('[data-m]');
+    if (e.target !== sheet && !b) return;
+    sheet.remove();
+    if (b) menuAction(g, b.dataset.m);
+  };
+}
+
+function menuAction(g, choice) {
+  if (choice === '1') {
+    if (!g.rounds.length) return;
+    if (!confirm('Undo round ' + g.rounds.length + '?')) return;
+    g.rounds.pop(); g.finished = false; touch(g); draft = null; render();
+  } else if (choice === '2') {
+    const n = prompt('Game name', g.name);
+    if (n && n.trim()) { g.name = n.trim(); touch(g); render(); }
+  } else if (choice === '3') {
+    const ng = { ...JSON.parse(JSON.stringify(g)), id: uid(), rounds: [], finished: false, created: Date.now(), updated: Date.now() };
+    ng.name = g.name.replace(/ \(\d+\)$/, '') + ' (' + (db.games.filter(x => x.name.startsWith(g.name.replace(/ \(\d+\)$/, ''))).length + 1) + ')';
+    if (g.type === 'blob') ng.firstDealer = ((g.firstDealer || 0) + 1) % g.players.length;
+    db.games.push(ng); save(); go({ name: 'game', id: ng.id });
+  } else if (choice === '4') {
+    if (!confirm('Delete "' + g.name + '"? This cannot be undone.')) return;
+    db.games = db.games.filter(x => x.id !== g.id); save(); go({ name: 'home' });
+  }
+}
+function touch(g) { g.updated = Date.now(); save(); }
+
+/* ---------- Simple tally ---------- */
+
+function renderSimple(g) {
+  if (!draft) draft = { vals: g.players.map(() => ''), neg: g.players.map(() => false), edit: null };
+  const d = draft;
+  const editing = d.edit !== null;
+
+  $('app').innerHTML = `
+    ${scoreboard(g)}
+    <div class="card"><h2>${editing ? 'Edit round ' + (d.edit + 1) : 'Round ' + (g.rounds.length + 1) + ' scores'}</h2>
+      ${g.players.map((p, i) => `<div class="row">
+        <div class="grow name">${esc(p)}</div>
+        <button class="sign ${d.neg[i] ? 'neg' : ''}" data-neg="${i}">${d.neg[i] ? '&minus;' : '+'}</button>
+        <input class="num" inputmode="numeric" pattern="[0-9]*" data-i="${i}" value="${esc(d.vals[i])}" placeholder="0">
+      </div>`).join('')}
+      <div class="gap"></div>
+      <button class="btn" id="addr">${editing ? 'Save changes' : 'Add round'}</button>
+      ${editing ? '<div class="gap"></div><button class="btn ghost" id="cancel">Cancel</button>' : ''}
+    </div>
+    ${g.rounds.length ? `<div class="card"><h2>Rounds (tap to edit)</h2><div class="scroll"><table class="hist">
+      <tr><th>#</th>${g.players.map(p => `<th>${esc(p)}</th>`).join('')}</tr>
+      ${g.rounds.map((r, ri) => `<tr data-r="${ri}">${'<td>' + (ri + 1) + '</td>'}${r.points.map(v => `<td>${v}</td>`).join('')}</tr>`).join('')}
+    </table></div></div>` : ''}`;
+
+  document.querySelectorAll('.num').forEach(inp => {
+    inp.oninput = e => d.vals[+e.target.dataset.i] = e.target.value.replace(/[^0-9]/g, '');
+    inp.onkeydown = e => {
+      if (e.key !== 'Enter') return;
+      const next = document.querySelector(`.num[data-i="${+inp.dataset.i + 1}"]`);
+      next ? next.focus() : $('addr').click();
+    };
+  });
+  document.querySelectorAll('[data-neg]').forEach(b => b.onclick = () => { d.neg[+b.dataset.neg] ^= true; renderSimple(g); });
+  $('addr').onclick = () => {
+    const points = d.vals.map((v, i) => (parseInt(v, 10) || 0) * (d.neg[i] ? -1 : 1));
+    if (editing) g.rounds[d.edit] = { points };
+    else g.rounds.push({ points });
+    touch(g); draft = null; renderSimple(g);
+  };
+  if ($('cancel')) $('cancel').onclick = () => { draft = null; renderSimple(g); };
+  document.querySelectorAll('[data-r]').forEach(tr => tr.onclick = () => {
+    const ri = +tr.dataset.r, pts = g.rounds[ri].points;
+    draft = { vals: pts.map(v => v ? String(Math.abs(v)) : ''), neg: pts.map(v => v < 0), edit: ri };
+    renderSimple(g); window.scrollTo(0, 0);
+  });
+}
+
+/* ---------- Blob ---------- */
+
+function renderBlob(g) {
+  const st = g.settings, n = g.players.length;
+  const sched = blobSchedule(st);
+  const ri = g.rounds.length;
+  const done = ri >= sched.length;
+  if (done && !g.finished) { g.finished = true; touch(g); }
+
+  let roundHtml = '';
+  if (done) {
+    const t = totals(g), l = leaders(g, t);
+    roundHtml = `<div class="card" style="text-align:center"><h2>Game over</h2>
+      <div style="font-size:22px;font-weight:700">\u{1F3C6} ${l.map(i => esc(g.players[i])).join(' & ')}</div>
+      <div class="sub">${t[l[0]]} points</div></div>`;
+  } else {
+    const cards = sched[ri];
+    const dealer = ((g.firstDealer || 0) + ri) % n;
+    const trump = blobTrump(st, ri);
+    const order = bidOrder(n, dealer);
+    if (!draft || draft.round !== ri) draft = { round: ri, phase: 'bid', bids: g.players.map(() => null), tricks: g.players.map(() => 0) };
+    const d = draft;
+
+    const bidSum = d.bids.reduce((a, b) => a + (b || 0), 0);
+    const allBid = d.bids.every(b => b !== null);
+    const othersSum = d.bids.reduce((a, b, i) => a + (i === dealer ? 0 : (b || 0)), 0);
+    const banned = st.hook ? cards - othersSum : -1;
+    const dealerBad = st.hook && d.bids[dealer] === banned;
+    const trickSum = d.tricks.reduce((a, b) => a + b, 0);
+
+    const info = `<div class="roundinfo">
+      <span class="pill">Round ${ri + 1} of ${sched.length}</span>
+      <span class="pill">${cards} card${cards > 1 ? 's' : ''}</span>
+      ${trump ? `<span class="pill trump ${trump.red ? 'red' : ''}">${trump.s} ${trump.n}</span>` : ''}
+      <span class="pill">Dealer: ${esc(g.players[dealer])}</span></div>`;
+
+    if (d.phase === 'bid') {
+      roundHtml = `<div class="card"><h2>Bids</h2>${info}
+        ${order.map(i => `<div class="row">
+          <div class="grow"><div class="name">${esc(g.players[i])}${i === dealer ? ' <span class="sub">(dealer)</span>' : ''}</div>
+          ${i === dealer && st.hook && banned >= 0 && banned <= cards ? `<div class="sub">can't bid ${banned}</div>` : ''}</div>
+          <div class="stepper"><button data-bid="${i}" data-d="-1">&minus;</button>
+          <span class="val">${d.bids[i] === null ? '&middot;' : d.bids[i]}</span>
+          <button data-bid="${i}" data-d="1">+</button></div></div>`).join('')}
+        <div class="sub" style="margin-top:8px">Bids total ${bidSum} for ${cards} trick${cards > 1 ? 's' : ''}
+          ${allBid ? (bidSum > cards ? '(over)' : bidSum < cards ? '(under)' : '') : ''}</div>
+        ${dealerBad ? `<p class="warn">Dealer can't bid ${banned}: bids would add up to ${cards}.</p>` : ''}
+        <div class="gap"></div>
+        <button class="btn" id="lock" ${!allBid || dealerBad ? 'disabled' : ''}>Lock bids &amp; play</button></div>`;
+    } else {
+      roundHtml = `<div class="card"><h2>Tricks won</h2>${info}
+        ${order.map(i => {
+          const hit = d.tricks[i] === d.bids[i];
+          return `<div class="row">
+          <div class="grow"><div class="name">${esc(g.players[i])}</div>
+          <div class="sub">bid ${d.bids[i]} &middot; <span class="${hit ? 'ok' : ''}">${hit ? 'making it, +' + blobPoints(st, d.bids[i], d.bids[i]) : 'missing'}</span></div></div>
+          <div class="stepper"><button data-tr="${i}" data-d="-1">&minus;</button>
+          <span class="val">${d.tricks[i]}</span>
+          <button data-tr="${i}" data-d="1">+</button></div></div>`; }).join('')}
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="chip" id="allmade">Everyone made it</button>
+          <button class="chip" id="rebid">Change bids</button></div>
+        <p class="${trickSum === cards ? 'sub ok' : 'warn'}">Tricks entered: ${trickSum} of ${cards}</p>
+        <button class="btn" id="score" ${trickSum !== cards ? 'disabled' : ''}>Score round</button></div>`;
+    }
+  }
+
+  $('app').innerHTML = roundHtml + scoreboard(g) + blobHistory(g);
+  if (done) return;
+
+  const d = draft, cards = sched[ri];
+  document.querySelectorAll('[data-bid]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.bid, cur = d.bids[i];
+    const next = cur === null ? 0 : cur + +b.dataset.d;
+    d.bids[i] = Math.min(cards, Math.max(0, next));
+    renderBlob(g);
+  });
+  document.querySelectorAll('[data-tr]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.tr;
+    d.tricks[i] = Math.min(cards, Math.max(0, d.tricks[i] + +b.dataset.d));
+    renderBlob(g);
+  });
+  if ($('lock')) $('lock').onclick = () => { d.phase = 'play'; d.tricks = d.bids.slice(); renderBlob(g); window.scrollTo(0, 0); };
+  if ($('allmade')) $('allmade').onclick = () => { d.tricks = d.bids.slice(); renderBlob(g); };
+  if ($('rebid')) $('rebid').onclick = () => { d.phase = 'bid'; renderBlob(g); };
+  if ($('score')) $('score').onclick = () => {
+    g.rounds.push({ cards, bids: d.bids.slice(), tricks: d.tricks.slice(),
+      points: d.bids.map((b, i) => blobPoints(st, b, d.tricks[i])) });
+    touch(g); draft = null; renderBlob(g); window.scrollTo(0, 0);
+  };
+}
+
+function blobHistory(g) {
+  if (!g.rounds.length) return '';
+  return `<div class="card"><h2>Rounds</h2><div class="scroll"><table class="hist">
+    <tr><th>Cards</th>${g.players.map(p => `<th>${esc(p)}</th>`).join('')}</tr>
+    ${g.rounds.map(r => `<tr><td>${r.cards}</td>${r.points.map((p, i) =>
+      `<td class="${r.bids[i] === r.tricks[i] ? 'made' : 'miss'}">${p}<div class="sub">${r.bids[i]}/${r.tricks[i]}</div></td>`).join('')}</tr>`).join('')}
+  </table></div><div class="sub" style="margin-top:6px">Small numbers are bid/tricks won.</div></div>`;
+}
+
+render();
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
