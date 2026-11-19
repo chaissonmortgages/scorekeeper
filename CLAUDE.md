@@ -9,9 +9,11 @@ Personal card game scorekeeper, installed on a phone as a PWA. Not a product. Ke
 
 ## How the code is laid out
 - State lives in `localStorage` under key `scores.v1` as `{ games: [...] }`.
-- A game: `{ id, type: 'simple' | 'blob', name, players: [names], rounds: [{ points: [...] }], lowWins, settings, firstDealer, finished, created, updated }`.
-  Blob rounds also store `cards`, `bids`, `tricks`.
-- Every round stores `points` per player, so `totals()` works the same for every game type.
+- Simple game: `{ id, type: 'simple', name, players, rounds: [{ points: [...] }], lowWins, created, updated }`.
+- Blob game: `{ id, type: 'blob', name, players, upAgain, cells, created, updated }` where `cells[round][player] = [bid, got]` as strings ('' when empty).
+  Cards per round come from `blobSchedule()`, NT/T from `blobNT()`, scores from `blobPoints()` (Wizard scoring). Running totals are computed, never stored.
+- `totals()` handles both types.
+- Blob is deliberately a paper style grid with no validation. Keep it that way: Mack prefers pen and paper over anything fussier.
 - Views: `renderHome`, `renderNew`, `renderGame` (which calls `renderSimple` or `renderBlob`). Each one rebuilds `#app` with innerHTML.
 
 ## Adding a new game type

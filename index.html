@@ -97,6 +97,35 @@
   .sheet-in { background: var(--card); width: 100%; max-width: 640px; margin: 0 auto; border-radius: 18px 18px 0 0;
     padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px); display: grid; gap: 10px; }
   .chip { border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 99px; padding: 5px 11px; font-size: 14px; }
+
+  /* Paper style Blob sheet */
+  .sheet-wrap { overflow-x: auto; margin: -6px -10px 0; background: #fffdf7; border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .paper { border-collapse: collapse; width: 100%; color: #1c1917; font-variant-numeric: tabular-nums; }
+  .paper th, .paper td { border: 1px solid #d6d3d1; padding: 0; }
+  .paper .lc { width: 30px; min-width: 30px; text-align: center; font-size: 14px; background: #f5f0e1;
+    position: sticky; z-index: 1; }
+  .paper .lc:first-child { left: 0; }
+  .paper .lc:nth-child(2) { left: 30px; border-right: 2px solid #a8a29e; }
+  .paper .cards { font-weight: 700; }
+  .paper .nt { font-size: 12px; color: #57534e; }
+  .paper .nt.isnt { color: #b91c1c; font-weight: 700; }
+  .paper .pc { min-width: 78px; border-right: 2px solid #a8a29e; }
+  .paper thead th { background: #f5f0e1; position: sticky; top: 0; }
+  .paper .pn { font-weight: 700; font-size: 14px; padding: 6px 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; margin: 0 auto; }
+  .paper .pt { font-size: 18px; font-weight: 800; padding: 0 4px 5px; }
+  .paper th.lead .pn::after { content: " \1F451"; }
+  .paper .lbl th { font-size: 9px; color: #a8a29e; font-weight: 500; text-transform: uppercase; }
+  .trio { display: grid; grid-template-columns: 1fr 1fr 2fr; align-items: stretch; }
+  .trio > * { text-align: center; }
+  .trio .b { width: 100%; min-width: 0; height: 38px; border: 0; border-right: 1px dashed #d6d3d1; background: transparent;
+    font: inherit; font-size: 17px; text-align: center; color: #1c1917; border-radius: 0; padding: 0; -webkit-appearance: none; }
+  .trio .b:focus { outline: 2px solid #166534; outline-offset: -2px; background: #ecfdf5; }
+  .trio .s { display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; }
+  .trio .s.miss { color: #b91c1c; }
+  .trio .s.hit { color: #166534; }
+  .paper tbody tr.cur td { background: #fef9c3; }
+  .paper tbody tr.cur .lc { background: #fde68a; }
 </style>
 </head>
 <body>
@@ -111,20 +140,17 @@
 /* Scores: a tiny card game scorekeeper. All data lives in localStorage on this device. */
 
 const KEY = 'scores.v1';
-const SUITS = [
-  { s: '♥', n: 'Hearts', red: true },
-  { s: '♣', n: 'Clubs', red: false },
-  { s: '♦', n: 'Diamonds', red: true },
-  { s: '♠', n: 'Spades', red: false },
-];
-const NO_TRUMP = { s: 'NT', n: 'No trump', red: false };
-
 let db = load();
 let view = { name: 'home' };   // home | new | game
+try { const v = JSON.parse(localStorage.getItem(KEY + '.view')); if (v && v.name === 'game') view = v; } catch {}
 let draft = null;              // new game form state, or in-round entry state
 
 function load() {
-  try { return JSON.parse(localStorage.getItem(KEY)) || { games: [] }; }
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY)) || { games: [] };
+    d.games = d.games.filter(g => g.type !== 'blob' || g.cells);  // drop games from the old Blob version
+    return d;
+  }
   catch { return { games: [] }; }
 }
 function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
@@ -135,39 +161,53 @@ const $ = id => document.getElementById(id);
 
 /* ---------- Blob rules ---------- */
 
-// Cards dealt each round, e.g. 7,6,5,4,3,2,1,2,3,4,5,6,7
-function blobSchedule(st) {
+// Most cards everyone can get, e.g. 13 for 4 players
+function blobMax(n) { return Math.max(1, Math.floor(52 / n)); }
+// Cards each round: max down to 1, and optionally back up to max
+function blobSchedule(g) {
   const down = [];
-  for (let c = st.startCards; c >= 1; c--) down.push(c);
-  if (st.direction === 'up') return down.slice().reverse();
-  if (st.direction === 'down') return down;
-  return down.concat(down.slice(0, -1).reverse());
+  for (let c = blobMax(g.players.length); c >= 1; c--) down.push(c);
+  return g.upAgain ? down.concat(down.slice(0, -1).reverse()) : down;
 }
-function blobTrump(st, i) {
-  if (!st.trumps) return null;
-  const list = st.noTrump ? SUITS.concat([NO_TRUMP]) : SUITS;
-  return list[i % list.length];
+// No trump first, then two trump rounds, repeat
+function blobNT(i) { return i % 3 === 0; }
+// Wizard scoring: hit = 20 + 10 per trick, miss = minus 10 per trick off
+function blobPoints(guess, actual) {
+  return guess === actual ? 20 + 10 * actual : -10 * Math.abs(guess - actual);
 }
-function blobPoints(st, bid, tricks) {
-  if (bid !== tricks) return 0;
-  return st.bonus + (st.zeroScoresBonusOnly && bid === 0 ? 0 : bid);
-}
-// Seat order for a round, starting left of the dealer; the dealer bids last
-function bidOrder(n, dealer) {
-  const order = [];
-  for (let k = 1; k <= n; k++) order.push((dealer + k) % n);
-  return order;
+function parseBox(v) { return v === '' || v == null ? null : parseInt(v, 10); }
+// Running total per round per player; null once a row is incomplete
+function blobRunning(g) {
+  const run = g.players.map(() => 0), out = [];
+  let broken = g.players.map(() => false);
+  g.cells.forEach(row => {
+    out.push(row.map(([gs, ac], p) => {
+      const a = parseBox(gs), b = parseBox(ac);
+      if (broken[p] || a === null || b === null || isNaN(a) || isNaN(b)) { broken[p] = true; return null; }
+      run[p] += blobPoints(a, b);
+      return { total: run[p], hit: a === b };
+    }));
+  });
+  return out;
 }
 
 /* ---------- Totals ---------- */
 
 function totals(g) {
+  if (g.type === 'blob') {
+    const run = blobRunning(g), t = g.players.map(() => 0);
+    run.forEach(row => row.forEach((c, p) => { if (c) t[p] = c.total; }));
+    return t;
+  }
   const t = g.players.map(() => 0);
   for (const r of g.rounds) r.points.forEach((p, i) => t[i] += p);
   return t;
 }
+function started(g) {
+  return g.type === 'blob' ? g.cells.some(r => r.some(c => c[0] !== '' || c[1] !== '')) : g.rounds.length > 0;
+}
 function leaders(g, t) {
-  if (!g.rounds.length) return [];
+  if (!started(g)) return [];
   const best = g.lowWins ? Math.min(...t) : Math.max(...t);
   return t.map((v, i) => v === best ? i : -1).filter(i => i >= 0);
 }
@@ -190,7 +230,7 @@ function render() {
   else if (view.name === 'new') renderNew();
   else if (view.name === 'game') game() ? renderGame() : go({ name: 'home' });
 }
-function go(v) { view = v; draft = null; render(); window.scrollTo(0, 0); }
+function go(v) { view = v; draft = null; localStorage.setItem(KEY + '.view', JSON.stringify(v)); render(); window.scrollTo(0, 0); }
 
 function renderHome() {
   setHeader('Scores', null, '+ New', () => go({ name: 'new' }));
@@ -219,12 +259,10 @@ function renderNew() {
   setHeader('New game', () => go({ name: 'home' }));
   if (!draft) draft = {
     type: 'simple', name: '', players: lastPlayers(), lowWins: false,
-    blob: { startCards: 7, direction: 'both', bonus: 10, hook: true, trumps: true, noTrump: false, zeroScoresBonusOnly: false },
+    upAgain: false,
   };
   const d = draft;
   const n = d.players.filter(p => p.trim()).length;
-  const maxCards = Math.max(1, Math.floor(52 / Math.max(n, 1)));
-  if (d.blob.startCards > maxCards) d.blob.startCards = maxCards;
 
   $('app').innerHTML = `
     <div class="card">
@@ -244,22 +282,11 @@ function renderNew() {
     <div class="card"><h2>Options</h2>
       <div class="toggle"><span>Lowest score wins</span><input type="checkbox" id="low" ${d.lowWins ? 'checked' : ''}></div>
     </div>` : `
-    <div class="card"><h2>Blob rules</h2>
-      <div class="toggle"><span>Starting cards <span class="sub">(max ${maxCards})</span></span>
-        <div class="stepper"><button data-sc="-1">&minus;</button><span class="val">${d.blob.startCards}</span><button data-sc="1">+</button></div></div>
-      <div class="field" style="margin-top:12px"><label>Rounds</label>
-        <div class="seg">
-          <button data-dir="both" class="${d.blob.direction === 'both' ? 'on' : ''}">Down &amp; up</button>
-          <button data-dir="down" class="${d.blob.direction === 'down' ? 'on' : ''}">Down only</button>
-          <button data-dir="up" class="${d.blob.direction === 'up' ? 'on' : ''}">Up only</button></div>
-        <div class="sub" style="margin-top:6px">${blobSchedule(d.blob).join(', ')} (${blobSchedule(d.blob).length} rounds)</div></div>
-      <div class="toggle"><span>Bonus for making your bid</span>
-        <div class="stepper"><button data-bonus="-1">&minus;</button><span class="val">${d.blob.bonus}</span><button data-bonus="1">+</button></div></div>
-      <div class="sub" style="padding:6px 0 4px">Make it: ${d.blob.bonus} + tricks bid. Miss it: 0.</div>
-      <div class="toggle"><span>Bid 0 and make it scores bonus only</span><input type="checkbox" id="zbo" ${d.blob.zeroScoresBonusOnly ? 'checked' : ''}></div>
-      <div class="toggle"><span>Dealer can't make bids add up</span><input type="checkbox" id="hook" ${d.blob.hook ? 'checked' : ''}></div>
-      <div class="toggle"><span>Rotate trumps</span><input type="checkbox" id="trumps" ${d.blob.trumps ? 'checked' : ''}></div>
-      ${d.blob.trumps ? `<div class="toggle"><span>Include a no trump round</span><input type="checkbox" id="nt" ${d.blob.noTrump ? 'checked' : ''}></div>` : ''}
+    <div class="card"><h2>Rounds</h2>
+      <div class="seg">
+        <button data-up="0" class="${!d.upAgain ? 'on' : ''}">Down only</button>
+        <button data-up="1" class="${d.upAgain ? 'on' : ''}">Down, then back up</button></div>
+      <div class="sub" id="cardhint" style="margin-top:8px">${n >= 2 ? `${n} players start with ${Math.floor(52 / n)} cards.` : 'Add at least 2 players.'}</div>
     </div>`}
     <button class="btn" id="go" ${n < 2 ? 'disabled' : ''}>Start game</button>`;
 
@@ -267,20 +294,14 @@ function renderNew() {
   $('gname').oninput = e => d.name = e.target.value;
   document.querySelectorAll('#plist input').forEach(inp => inp.oninput = e => {
     d.players[+e.target.dataset.i] = e.target.value;
-    const ok = d.players.filter(p => p.trim()).length >= 2;
-    $('go').disabled = !ok;
+    const k = d.players.filter(p => p.trim()).length;
+    $('go').disabled = k < 2;
+    if ($('cardhint')) $('cardhint').textContent = k >= 2 ? `${k} players start with ${Math.floor(52 / k)} cards.` : 'Add at least 2 players.';
   });
-  document.querySelectorAll('#plist input').forEach(inp => inp.onchange = () => { if (d.type === 'blob') renderNew(); });
   document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { d.players.splice(+b.dataset.del, 1); renderNew(); });
   $('addp').onclick = () => { d.players.push(''); renderNew(); document.querySelector(`#plist input[data-i="${d.players.length - 1}"]`).focus(); };
   if ($('low')) $('low').onchange = e => d.lowWins = e.target.checked;
-  document.querySelectorAll('[data-sc]').forEach(b => b.onclick = () => {
-    d.blob.startCards = Math.min(maxCards, Math.max(1, d.blob.startCards + +b.dataset.sc)); renderNew(); });
-  document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => { d.blob.direction = b.dataset.dir; renderNew(); });
-  document.querySelectorAll('[data-bonus]').forEach(b => b.onclick = () => {
-    d.blob.bonus = Math.max(0, d.blob.bonus + +b.dataset.bonus); renderNew(); });
-  for (const [id, k] of [['zbo', 'zeroScoresBonusOnly'], ['hook', 'hook'], ['trumps', 'trumps'], ['nt', 'noTrump']])
-    if ($(id)) $(id).onchange = e => { d.blob[k] = e.target.checked; renderNew(); };
+  document.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { d.upAgain = b.dataset.up === '1'; renderNew(); });
 
   $('go').onclick = () => {
     const players = d.players.map(p => p.trim()).filter(Boolean);
@@ -289,7 +310,7 @@ function renderNew() {
       id: uid(), type: d.type, name: d.name.trim() || (d.type === 'blob' ? 'Blob' : 'Game') + ' ' + new Date().toLocaleDateString(),
       players, rounds: [], lowWins: d.type === 'simple' ? d.lowWins : false, created: Date.now(), updated: Date.now(),
     };
-    if (d.type === 'blob') { g.settings = { ...d.blob }; g.firstDealer = 0; }
+    if (d.type === 'blob') { g.upAgain = d.upAgain; g.cells = blobSchedule(g).map(() => players.map(() => ['', ''])); }
     db.games.push(g); save();
     go({ name: 'game', id: g.id });
   };
@@ -315,7 +336,7 @@ function gameMenu(g) {
   const sheet = document.createElement('div');
   sheet.className = 'sheet';
   sheet.innerHTML = `<div class="sheet-in">
-    <button class="btn ghost" data-m="1" ${g.rounds.length ? '' : 'disabled'}>Undo last round</button>
+    ${g.type === 'blob' ? '' : `<button class="btn ghost" data-m="1" ${g.rounds.length ? '' : 'disabled'}>Undo last round</button>`}
     <button class="btn ghost" data-m="2">Rename game</button>
     <button class="btn ghost" data-m="3">Play again, same players</button>
     <button class="btn danger" data-m="4">Delete game</button>
@@ -340,7 +361,7 @@ function menuAction(g, choice) {
   } else if (choice === '3') {
     const ng = { ...JSON.parse(JSON.stringify(g)), id: uid(), rounds: [], finished: false, created: Date.now(), updated: Date.now() };
     ng.name = g.name.replace(/ \(\d+\)$/, '') + ' (' + (db.games.filter(x => x.name.startsWith(g.name.replace(/ \(\d+\)$/, ''))).length + 1) + ')';
-    if (g.type === 'blob') ng.firstDealer = ((g.firstDealer || 0) + 1) % g.players.length;
+    if (g.type === 'blob') ng.cells = g.cells.map(r => r.map(() => ['', '']));
     db.games.push(ng); save(); go({ name: 'game', id: ng.id });
   } else if (choice === '4') {
     if (!confirm('Delete "' + g.name + '"? This cannot be undone.')) return;
@@ -396,105 +417,52 @@ function renderSimple(g) {
   });
 }
 
-/* ---------- Blob ---------- */
+/* ---------- Blob (paper style grid) ---------- */
 
 function renderBlob(g) {
-  const st = g.settings, n = g.players.length;
-  const sched = blobSchedule(st);
-  const ri = g.rounds.length;
-  const done = ri >= sched.length;
-  if (done && !g.finished) { g.finished = true; touch(g); }
+  const sched = blobSchedule(g);
+  const t = totals(g), l = leaders(g, t);
+  $('app').innerHTML = `<div class="sheet-wrap"><table class="paper">
+    <thead><tr><th class="lc">#</th><th class="lc"></th>
+      ${g.players.map((p, i) => `<th class="pc ${l.includes(i) ? 'lead' : ''}"><div class="pn">${esc(p)}</div><div class="pt" data-tot="${i}">${t[i]}</div></th>`).join('')}</tr>
+    <tr class="lbl"><th class="lc"></th><th class="lc"></th>
+      ${g.players.map(() => `<th class="pc"><div class="trio"><span>bid</span><span>got</span><span>score</span></div></th>`).join('')}</tr></thead>
+    <tbody>${sched.map((c, r) => `<tr>
+      <td class="lc cards">${c}</td><td class="lc nt ${blobNT(r) ? 'isnt' : ''}">${blobNT(r) ? 'NT' : 'T'}</td>
+      ${g.players.map((_, p) => `<td class="pc"><div class="trio">
+        <input class="b" inputmode="numeric" pattern="[0-9]*" maxlength="2" data-r="${r}" data-p="${p}" data-k="0" value="${esc(g.cells[r][p][0])}">
+        <input class="b" inputmode="numeric" pattern="[0-9]*" maxlength="2" data-r="${r}" data-p="${p}" data-k="1" value="${esc(g.cells[r][p][1])}">
+        <div class="s" data-s="${r}-${p}"></div></div></td>`).join('')}
+    </tr>`).join('')}</tbody></table></div>`;
 
-  let roundHtml = '';
-  if (done) {
-    const t = totals(g), l = leaders(g, t);
-    roundHtml = `<div class="card" style="text-align:center"><h2>Game over</h2>
-      <div style="font-size:22px;font-weight:700">\u{1F3C6} ${l.map(i => esc(g.players[i])).join(' & ')}</div>
-      <div class="sub">${t[l[0]]} points</div></div>`;
-  } else {
-    const cards = sched[ri];
-    const dealer = ((g.firstDealer || 0) + ri) % n;
-    const trump = blobTrump(st, ri);
-    const order = bidOrder(n, dealer);
-    if (!draft || draft.round !== ri) draft = { round: ri, phase: 'bid', bids: g.players.map(() => null), tricks: g.players.map(() => 0) };
-    const d = draft;
-
-    const bidSum = d.bids.reduce((a, b) => a + (b || 0), 0);
-    const allBid = d.bids.every(b => b !== null);
-    const othersSum = d.bids.reduce((a, b, i) => a + (i === dealer ? 0 : (b || 0)), 0);
-    const banned = st.hook ? cards - othersSum : -1;
-    const dealerBad = st.hook && d.bids[dealer] === banned;
-    const trickSum = d.tricks.reduce((a, b) => a + b, 0);
-
-    const info = `<div class="roundinfo">
-      <span class="pill">Round ${ri + 1} of ${sched.length}</span>
-      <span class="pill">${cards} card${cards > 1 ? 's' : ''}</span>
-      ${trump ? `<span class="pill trump ${trump.red ? 'red' : ''}">${trump.s} ${trump.n}</span>` : ''}
-      <span class="pill">Dealer: ${esc(g.players[dealer])}</span></div>`;
-
-    if (d.phase === 'bid') {
-      roundHtml = `<div class="card"><h2>Bids</h2>${info}
-        ${order.map(i => `<div class="row">
-          <div class="grow"><div class="name">${esc(g.players[i])}${i === dealer ? ' <span class="sub">(dealer)</span>' : ''}</div>
-          ${i === dealer && st.hook && banned >= 0 && banned <= cards ? `<div class="sub">can't bid ${banned}</div>` : ''}</div>
-          <div class="stepper"><button data-bid="${i}" data-d="-1">&minus;</button>
-          <span class="val">${d.bids[i] === null ? '&middot;' : d.bids[i]}</span>
-          <button data-bid="${i}" data-d="1">+</button></div></div>`).join('')}
-        <div class="sub" style="margin-top:8px">Bids total ${bidSum} for ${cards} trick${cards > 1 ? 's' : ''}
-          ${allBid ? (bidSum > cards ? '(over)' : bidSum < cards ? '(under)' : '') : ''}</div>
-        ${dealerBad ? `<p class="warn">Dealer can't bid ${banned}: bids would add up to ${cards}.</p>` : ''}
-        <div class="gap"></div>
-        <button class="btn" id="lock" ${!allBid || dealerBad ? 'disabled' : ''}>Lock bids &amp; play</button></div>`;
-    } else {
-      roundHtml = `<div class="card"><h2>Tricks won</h2>${info}
-        ${order.map(i => {
-          const hit = d.tricks[i] === d.bids[i];
-          return `<div class="row">
-          <div class="grow"><div class="name">${esc(g.players[i])}</div>
-          <div class="sub">bid ${d.bids[i]} &middot; <span class="${hit ? 'ok' : ''}">${hit ? 'making it, +' + blobPoints(st, d.bids[i], d.bids[i]) : 'missing'}</span></div></div>
-          <div class="stepper"><button data-tr="${i}" data-d="-1">&minus;</button>
-          <span class="val">${d.tricks[i]}</span>
-          <button data-tr="${i}" data-d="1">+</button></div></div>`; }).join('')}
-        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="chip" id="allmade">Everyone made it</button>
-          <button class="chip" id="rebid">Change bids</button></div>
-        <p class="${trickSum === cards ? 'sub ok' : 'warn'}">Tricks entered: ${trickSum} of ${cards}</p>
-        <button class="btn" id="score" ${trickSum !== cards ? 'disabled' : ''}>Score round</button></div>`;
-    }
-  }
-
-  $('app').innerHTML = roundHtml + scoreboard(g) + blobHistory(g);
-  if (done) return;
-
-  const d = draft, cards = sched[ri];
-  document.querySelectorAll('[data-bid]').forEach(b => b.onclick = () => {
-    const i = +b.dataset.bid, cur = d.bids[i];
-    const next = cur === null ? 0 : cur + +b.dataset.d;
-    d.bids[i] = Math.min(cards, Math.max(0, next));
-    renderBlob(g);
+  paintScores(g);
+  document.querySelectorAll('.paper input').forEach(inp => {
+    inp.oninput = () => {
+      inp.value = inp.value.replace(/[^0-9]/g, '');
+      g.cells[+inp.dataset.r][+inp.dataset.p][+inp.dataset.k] = inp.value;
+      touch(g); paintScores(g);
+    };
+    inp.onfocus = () => inp.select();
   });
-  document.querySelectorAll('[data-tr]').forEach(b => b.onclick = () => {
-    const i = +b.dataset.tr;
-    d.tricks[i] = Math.min(cards, Math.max(0, d.tricks[i] + +b.dataset.d));
-    renderBlob(g);
-  });
-  if ($('lock')) $('lock').onclick = () => { d.phase = 'play'; d.tricks = d.bids.slice(); renderBlob(g); window.scrollTo(0, 0); };
-  if ($('allmade')) $('allmade').onclick = () => { d.tricks = d.bids.slice(); renderBlob(g); };
-  if ($('rebid')) $('rebid').onclick = () => { d.phase = 'bid'; renderBlob(g); };
-  if ($('score')) $('score').onclick = () => {
-    g.rounds.push({ cards, bids: d.bids.slice(), tricks: d.tricks.slice(),
-      points: d.bids.map((b, i) => blobPoints(st, b, d.tricks[i])) });
-    touch(g); draft = null; renderBlob(g); window.scrollTo(0, 0);
-  };
 }
 
-function blobHistory(g) {
-  if (!g.rounds.length) return '';
-  return `<div class="card"><h2>Rounds</h2><div class="scroll"><table class="hist">
-    <tr><th>Cards</th>${g.players.map(p => `<th>${esc(p)}</th>`).join('')}</tr>
-    ${g.rounds.map(r => `<tr><td>${r.cards}</td>${r.points.map((p, i) =>
-      `<td class="${r.bids[i] === r.tricks[i] ? 'made' : 'miss'}">${p}<div class="sub">${r.bids[i]}/${r.tricks[i]}</div></td>`).join('')}</tr>`).join('')}
-  </table></div><div class="sub" style="margin-top:6px">Small numbers are bid/tricks won.</div></div>`;
+// Update score boxes and header totals in place so typing never loses focus
+function paintScores(g) {
+  const run = blobRunning(g);
+  run.forEach((row, r) => row.forEach((c, p) => {
+    const el = document.querySelector(`[data-s="${r}-${p}"]`);
+    el.textContent = c ? c.total : '';
+    el.className = 's' + (c ? (c.hit ? ' hit' : ' miss') : '');
+  }));
+  const t = totals(g), l = leaders(g, t);
+  t.forEach((v, i) => {
+    const el = document.querySelector(`[data-tot="${i}"]`);
+    el.textContent = v;
+    el.parentElement.classList.toggle('lead', l.includes(i));
+  });
+  // Shade the row being played: first row someone hasn't filled in yet
+  const cur = g.cells.findIndex(row => row.some(c => c[0] === '' || c[1] === ''));
+  document.querySelectorAll('.paper tbody tr').forEach((tr, i) => tr.classList.toggle('cur', i === cur));
 }
 
 render();

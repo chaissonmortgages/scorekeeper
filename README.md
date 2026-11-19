@@ -6,12 +6,13 @@ A tiny card game scorekeeper for my phone. One HTML file, no build step, no serv
 
 **Simple tally.** Add players, then after each round type in everyone's points. Totals add up automatically. Use the +/- button for negative scores. Tap any past round to fix it. Option for "lowest score wins".
 
-**Blob.** Handles the whole game:
-- Cards per round run down and back up (for example 7, 6 ... 1 ... 6, 7), or down only, or up only
-- Shows the dealer and trump suit each round (Hearts, Clubs, Diamonds, Spades, optional no trump)
-- Enter bids, then tricks won. It checks tricks add up to the cards dealt
-- Optional dealer rule: the dealer can't bid the number that makes total bids equal the tricks available
-- Scoring: make your bid exactly and get the bonus (default 10) plus your bid. Miss and get 0. Both are adjustable
+**Blob.** A paper style score sheet:
+- Names across the top with each player's total, cards and NT/T down the left side
+- Starts with the most cards possible (13 for 4 players) and goes down to 1, with the option to come back up
+- Trump pattern is no trump, trump, trump, repeat. The trump suit itself is whatever card you flip, so the app doesn't track it
+- Each player gets two small boxes per round (bid, then what they got) and a bigger box with their running total
+- Wizard scoring: hit your bid and get 20 + 10 per trick. Miss and lose 10 for each trick you were off
+- The row being played is highlighted
 
 ## Put it on your phone
 
