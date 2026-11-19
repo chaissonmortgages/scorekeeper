@@ -242,7 +242,7 @@ function renderHome() {
         const lead = l.length ? g.players[l[0]] + ' leads' : 'Not started';
         return `<div class="row" data-id="${g.id}">
           <div class="grow"><div class="name">${esc(g.name)}</div>
-          <div class="sub">${g.type === 'blob' ? 'Blob' : 'Simple'} &middot; ${g.players.length} players &middot; ${esc(lead)}${g.finished ? ' &middot; done' : ''}</div></div>
+          <div class="sub">${g.type === 'blob' ? 'Blob' : 'Basic'} &middot; ${g.players.length} players &middot; ${esc(lead)}${g.finished ? ' &middot; done' : ''}</div></div>
           <div class="sub">${new Date(g.updated).toLocaleDateString()}</div></div>`;
       }).join('')}
     </div>` : `<div class="empty">No games yet.<div class="gap"></div><button class="btn" id="start">Start a game</button></div>`;
@@ -267,7 +267,7 @@ function renderNew() {
   $('app').innerHTML = `
     <div class="card">
       <div class="field"><label>Game</label>
-        <div class="seg"><button data-type="simple" class="${d.type === 'simple' ? 'on' : ''}">Simple tally</button>
+        <div class="seg"><button data-type="simple" class="${d.type === 'simple' ? 'on' : ''}">Basic</button>
         <button data-type="blob" class="${d.type === 'blob' ? 'on' : ''}">Blob</button></div></div>
       <div class="field"><label>Name (optional)</label>
         <input type="text" id="gname" placeholder="${d.type === 'blob' ? 'Blob' : 'Game'} night" value="${esc(d.name)}"></div>
