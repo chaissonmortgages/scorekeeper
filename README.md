@@ -16,12 +16,12 @@ A tiny card game scorekeeper for my phone. One HTML file, no build step, no serv
 
 ## Put it on your phone
 
-It needs to be served from a web address once so the phone can install it. Easiest is GitHub Pages:
+Hosted on Netlify, linked to this GitHub repo. Every push to `main` redeploys automatically, and the installed app grabs the new version the next time it's opened with signal.
 
-1. Push this repo to GitHub
-2. Repo **Settings > Pages**, set Source to `main` branch, `/ (root)`, Save
-3. Open `https://<your-username>.github.io/<repo-name>/` on your phone
-4. **iPhone (Safari):** Share > Add to Home Screen. **Android (Chrome):** menu > Install app
+One time setup:
+1. Netlify: Add new site > Import an existing project > GitHub > `scorekeeper`. Leave build settings blank (`netlify.toml` handles it) and deploy
+2. Open the Netlify URL on your phone
+3. **iPhone (Safari):** Share > Add to Home Screen. **Android (Chrome):** menu > Install app
 
 After that it opens full screen like a normal app and works with no signal.
 

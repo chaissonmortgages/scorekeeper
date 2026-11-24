@@ -1,0 +1,15 @@
+# Plain static site: no build step, serve the repo root.
+[build]
+  publish = "."
+  command = ""
+
+# Always check for a fresh copy of the app shell so phones pick up changes on next open.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
