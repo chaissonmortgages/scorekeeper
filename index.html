@@ -126,6 +126,10 @@
   .trio .s.miss { color: #b91c1c; }
   .trio .s.hit { color: #166534; }
   .paper tbody tr.cur td { background: #fef9c3; }
+  .paper tbody tr.even td { background: #fee2e2; }
+  .paper tbody tr.even .lc { background: #fca5a5; }
+  .evenmsg { background: #b91c1c; color: #fff; font-weight: 600; font-size: 15px; padding: 10px 12px;
+    border-radius: 10px; margin: -4px -10px 10px; position: sticky; top: 70px; z-index: 4; }
   .paper tbody tr.cur .lc { background: #fde68a; }
 </style>
 </head>
@@ -177,14 +181,21 @@ function blobPoints(guess, actual) {
   return guess === actual ? 20 + 10 * actual : -10 * Math.abs(guess - actual);
 }
 function parseBox(v) { return v === '' || v == null ? null : parseInt(v, 10); }
-// Running total per round per player; null once a row is incomplete
+// Dealer rule: once every bid is in, the bids can't add up to the cards dealt
+function blobEven(g, r) {
+  const bids = g.cells[r].map(c => parseBox(c[0]));
+  if (bids.some(b => b === null || isNaN(b))) return false;
+  return bids.reduce((a, b) => a + b, 0) === blobSchedule(g)[r];
+}
+// Running total per round per player; null once a row is incomplete or breaks the dealer rule
 function blobRunning(g) {
   const run = g.players.map(() => 0), out = [];
   let broken = g.players.map(() => false);
-  g.cells.forEach(row => {
+  g.cells.forEach((row, r) => {
+    const even = blobEven(g, r);
     out.push(row.map(([gs, ac], p) => {
       const a = parseBox(gs), b = parseBox(ac);
-      if (broken[p] || a === null || b === null || isNaN(a) || isNaN(b)) { broken[p] = true; return null; }
+      if (even || broken[p] || a === null || b === null || isNaN(a) || isNaN(b)) { broken[p] = true; return null; }
       run[p] += blobPoints(a, b);
       return { total: run[p], hit: a === b };
     }));
@@ -210,6 +221,7 @@ function started(g) {
 function leaders(g, t) {
   if (!started(g)) return [];
   const best = g.lowWins ? Math.min(...t) : Math.max(...t);
+  if (t.every(v => v === best)) return [];
   return t.map((v, i) => v === best ? i : -1).filter(i => i >= 0);
 }
 
@@ -423,7 +435,7 @@ function renderSimple(g) {
 function renderBlob(g) {
   const sched = blobSchedule(g);
   const t = totals(g), l = leaders(g, t);
-  $('app').innerHTML = `<div class="sheet-wrap"><table class="paper">
+  $('app').innerHTML = `<div class="evenmsg" id="evenmsg" hidden></div><div class="sheet-wrap"><table class="paper">
     <thead><tr><th class="lc">#</th><th class="lc"></th>
       ${g.players.map((p, i) => `<th class="pc ${l.includes(i) ? 'lead' : ''}"><div class="pn">${esc(p)}</div><div class="pt" data-tot="${i}">${t[i]}</div></th>`).join('')}</tr>
     <tr class="lbl"><th class="lc"></th><th class="lc"></th>
@@ -461,6 +473,16 @@ function paintScores(g) {
     el.textContent = v;
     el.parentElement.classList.toggle('lead', l.includes(i));
   });
+  // Flag rounds where the bids add up to the cards dealt
+  const sched = blobSchedule(g), bad = [];
+  document.querySelectorAll('.paper tbody tr').forEach((tr, i) => {
+    const even = blobEven(g, i);
+    tr.classList.toggle('even', even);
+    if (even) bad.push(sched[i]);
+  });
+  const msg = $('evenmsg');
+  msg.hidden = !bad.length;
+  msg.textContent = bad.length ? `Bids can't add up to ${bad[0]}. Dealer has to change their bid.` : '';
   // Shade the row being played: first row someone hasn't filled in yet
   const cur = g.cells.findIndex(row => row.some(c => c[0] === '' || c[1] === ''));
   document.querySelectorAll('.paper tbody tr').forEach((tr, i) => tr.classList.toggle('cur', i === cur));

@@ -13,7 +13,8 @@ Personal card game scorekeeper, installed on a phone as a PWA. Not a product. Ke
 - Blob game: `{ id, type: 'blob', name, players, upAgain, cells, created, updated }` where `cells[round][player] = [bid, got]` as strings ('' when empty).
   Cards per round come from `blobSchedule()`, NT/T from `blobNT()`, scores from `blobPoints()` (Wizard scoring). Running totals are computed, never stored.
 - `totals()` handles both types.
-- Blob is deliberately a paper style grid with no validation. Keep it that way: Mack prefers pen and paper over anything fussier.
+- Blob dealer rule: once every bid in a round is in, they can't add up to the cards dealt (`blobEven()`). That row turns red, a banner shows, and its scores stay blank until a bid changes.
+- Otherwise Blob is deliberately a paper style grid with no validation. Keep it that way: Mack prefers pen and paper over anything fussier.
 - Views: `renderHome`, `renderNew`, `renderGame` (which calls `renderSimple` or `renderBlob`). Each one rebuilds `#app` with innerHTML.
 
 ## Adding a new game type
