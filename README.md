@@ -4,7 +4,7 @@ A tiny card game scorekeeper for my phone. One HTML file, no build step, no serv
 
 ## Game types
 
-**Basic.** Add players, then after each round type in everyone's points. Totals add up automatically. Use the +/- button for negative scores. Tap any past round to fix it. Option for "lowest score wins".
+**Basic.** A paper style grid: names and totals across the top, one box per player per round. Type each score and the totals add up. New rows appear as you fill them in.
 
 **Blob.** A paper style score sheet:
 - Names across the top with each player's total, cards and NT/T down the left side

@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever you change index.html so phones pick up the update.
-const VERSION = 'scores-v5';
+const VERSION = 'scores-v6';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

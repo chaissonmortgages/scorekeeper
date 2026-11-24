@@ -126,6 +126,10 @@
   .trio .s.miss { color: #b91c1c; }
   .trio .s.hit { color: #166534; }
   .paper tbody tr.cur td { background: #fef9c3; }
+  .paper.basic .pc { min-width: 64px; }
+  .paper .one { width: 100%; height: 40px; border: 0; background: transparent; font: inherit; font-size: 18px; font-weight: 600;
+    text-align: center; color: #1c1917; border-radius: 0; padding: 0; -webkit-appearance: none; }
+  .paper .one:focus { outline: 2px solid #166534; outline-offset: -2px; background: #ecfdf5; }
   .paper tbody tr.even td { background: #fee2e2; }
   .paper tbody tr.even .lc { background: #fca5a5; }
   .evenmsg { background: #b91c1c; color: #fff; font-weight: 600; font-size: 15px; padding: 10px 12px;
@@ -154,6 +158,9 @@ function load() {
   try {
     const d = JSON.parse(localStorage.getItem(KEY)) || { games: [] };
     d.games = d.games.filter(g => g.type !== 'blob' || g.cells);  // drop games from the old Blob version
+    d.games.forEach(g => {  // Basic games moved from rounds to a grid of strings
+      if (g.type === 'simple' && !g.grid) g.grid = (g.rounds || []).map(r => r.points.map(v => String(v)));
+    });
     return d;
   }
   catch { return { games: [] }; }
@@ -212,11 +219,11 @@ function totals(g) {
     return t;
   }
   const t = g.players.map(() => 0);
-  for (const r of g.rounds) r.points.forEach((p, i) => t[i] += p);
+  for (const row of g.grid) row.forEach((v, i) => { const n = parseInt(v, 10); if (!isNaN(n)) t[i] += n; });
   return t;
 }
 function started(g) {
-  return g.type === 'blob' ? g.cells.some(r => r.some(c => c[0] !== '' || c[1] !== '')) : g.rounds.length > 0;
+  return g.type === 'blob' ? g.cells.some(r => r.some(c => c[0] !== '' || c[1] !== '')) : g.grid.some(r => r.some(v => v !== ''));
 }
 function leaders(g, t) {
   if (!started(g)) return [];
@@ -321,22 +328,12 @@ function renderNew() {
     if (players.length < 2) return;
     const g = {
       id: uid(), type: d.type, name: d.name.trim() || (d.type === 'blob' ? 'Blob' : 'Game') + ' ' + new Date().toLocaleDateString(),
-      players, rounds: [], lowWins: d.type === 'simple' ? d.lowWins : false, created: Date.now(), updated: Date.now(),
+      players, grid: [], lowWins: d.type === 'simple' ? d.lowWins : false, created: Date.now(), updated: Date.now(),
     };
     if (d.type === 'blob') { g.upAgain = d.upAgain; g.cells = blobSchedule(g).map(() => players.map(() => ['', ''])); }
     db.games.push(g); save();
     go({ name: 'game', id: g.id });
   };
-}
-
-function scoreboard(g) {
-  const t = totals(g), l = leaders(g, t);
-  const last = g.rounds[g.rounds.length - 1];
-  return `<div class="card"><h2>Totals${g.rounds.length ? ' after round ' + g.rounds.length : ''}</h2>
-    ${g.players.map((p, i) => `<div class="row ${l.includes(i) ? 'leader' : ''}">
-      <div class="grow"><div class="name">${esc(p)}</div>
-      ${last ? `<div class="sub">last round ${last.points[i] >= 0 ? '+' : ''}${last.points[i]}</div>` : ''}</div>
-      <div class="total">${t[i]}</div></div>`).join('')}</div>`;
 }
 
 function renderGame() {
@@ -349,7 +346,6 @@ function gameMenu(g) {
   const sheet = document.createElement('div');
   sheet.className = 'sheet';
   sheet.innerHTML = `<div class="sheet-in">
-    ${g.type === 'blob' ? '' : `<button class="btn ghost" data-m="1" ${g.rounds.length ? '' : 'disabled'}>Undo last round</button>`}
     <button class="btn ghost" data-m="2">Rename game</button>
     <button class="btn ghost" data-m="3">Play again, same players</button>
     <button class="btn danger" data-m="4">Delete game</button>
@@ -364,15 +360,11 @@ function gameMenu(g) {
 }
 
 function menuAction(g, choice) {
-  if (choice === '1') {
-    if (!g.rounds.length) return;
-    if (!confirm('Undo round ' + g.rounds.length + '?')) return;
-    g.rounds.pop(); g.finished = false; touch(g); draft = null; render();
-  } else if (choice === '2') {
+  if (choice === '2') {
     const n = prompt('Game name', g.name);
     if (n && n.trim()) { g.name = n.trim(); touch(g); render(); }
   } else if (choice === '3') {
-    const ng = { ...JSON.parse(JSON.stringify(g)), id: uid(), rounds: [], finished: false, created: Date.now(), updated: Date.now() };
+    const ng = { ...JSON.parse(JSON.stringify(g)), id: uid(), grid: [], finished: false, created: Date.now(), updated: Date.now() };
     ng.name = g.name.replace(/ \(\d+\)$/, '') + ' (' + (db.games.filter(x => x.name.startsWith(g.name.replace(/ \(\d+\)$/, ''))).length + 1) + ')';
     if (g.type === 'blob') ng.cells = g.cells.map(r => r.map(() => ['', '']));
     db.games.push(ng); save(); go({ name: 'game', id: ng.id });
@@ -383,51 +375,62 @@ function menuAction(g, choice) {
 }
 function touch(g) { g.updated = Date.now(); save(); }
 
-/* ---------- Simple tally ---------- */
+/* ---------- Basic (paper style grid, one box per player per round) ---------- */
+
+const BASIC_MIN_ROWS = 10;
+function basicRowHtml(g, r) {
+  return `<tr><td class="lc cards">${r + 1}</td>${g.players.map((_, p) =>
+    `<td class="pc"><input class="one" inputmode="numeric" pattern="[0-9]*" data-r="${r}" data-p="${p}" value="${esc(g.grid[r][p])}"></td>`).join('')}</tr>`;
+}
+// Keep at least 10 rows, and always one empty row at the bottom
+function basicPad(g) {
+  let added = false;
+  const empty = row => row.every(v => v === '');
+  while (g.grid.length < BASIC_MIN_ROWS || !empty(g.grid[g.grid.length - 1])) {
+    g.grid.push(g.players.map(() => '')); added = true;
+  }
+  return added;
+}
 
 function renderSimple(g) {
-  if (!draft) draft = { vals: g.players.map(() => ''), neg: g.players.map(() => false), edit: null };
-  const d = draft;
-  const editing = d.edit !== null;
+  basicPad(g);
+  $('app').innerHTML = `<div class="sheet-wrap"><table class="paper basic">
+    <thead><tr><th class="lc">#</th>
+      ${g.players.map((p, i) => `<th class="pc"><div class="pn">${esc(p)}</div><div class="pt" data-tot="${i}"></div></th>`).join('')}</tr></thead>
+    <tbody id="basicrows">${g.grid.map((_, r) => basicRowHtml(g, r)).join('')}</tbody></table></div>`;
+  paintBasic(g);
+  bindBasic(g);
+}
 
-  $('app').innerHTML = `
-    ${scoreboard(g)}
-    <div class="card"><h2>${editing ? 'Edit round ' + (d.edit + 1) : 'Round ' + (g.rounds.length + 1) + ' scores'}</h2>
-      ${g.players.map((p, i) => `<div class="row">
-        <div class="grow name">${esc(p)}</div>
-        <button class="sign ${d.neg[i] ? 'neg' : ''}" data-neg="${i}">${d.neg[i] ? '&minus;' : '+'}</button>
-        <input class="num" inputmode="numeric" pattern="[0-9]*" data-i="${i}" value="${esc(d.vals[i])}" placeholder="0">
-      </div>`).join('')}
-      <div class="gap"></div>
-      <button class="btn" id="addr">${editing ? 'Save changes' : 'Add round'}</button>
-      ${editing ? '<div class="gap"></div><button class="btn ghost" id="cancel">Cancel</button>' : ''}
-    </div>
-    ${g.rounds.length ? `<div class="card"><h2>Rounds (tap to edit)</h2><div class="scroll"><table class="hist">
-      <tr><th>#</th>${g.players.map(p => `<th>${esc(p)}</th>`).join('')}</tr>
-      ${g.rounds.map((r, ri) => `<tr data-r="${ri}">${'<td>' + (ri + 1) + '</td>'}${r.points.map(v => `<td>${v}</td>`).join('')}</tr>`).join('')}
-    </table></div></div>` : ''}`;
-
-  document.querySelectorAll('.num').forEach(inp => {
-    inp.oninput = e => d.vals[+e.target.dataset.i] = e.target.value.replace(/[^0-9]/g, '');
-    inp.onkeydown = e => {
-      if (e.key !== 'Enter') return;
-      const next = document.querySelector(`.num[data-i="${+inp.dataset.i + 1}"]`);
-      next ? next.focus() : $('addr').click();
+function bindBasic(g) {
+  document.querySelectorAll('.paper.basic input').forEach(inp => {
+    if (inp.dataset.bound) return;
+    inp.dataset.bound = '1';
+    inp.onfocus = () => inp.select();
+    inp.oninput = () => {
+      inp.value = inp.value.replace(/[^0-9]/g, '');
+      g.grid[+inp.dataset.r][+inp.dataset.p] = inp.value;
+      const before = g.grid.length;
+      if (basicPad(g)) {
+        // Add new rows in place so the box being typed in keeps focus
+        const body = $('basicrows');
+        for (let r = before; r < g.grid.length; r++) body.insertAdjacentHTML('beforeend', basicRowHtml(g, r));
+        bindBasic(g);
+      }
+      touch(g); paintBasic(g);
     };
   });
-  document.querySelectorAll('[data-neg]').forEach(b => b.onclick = () => { d.neg[+b.dataset.neg] ^= true; renderSimple(g); });
-  $('addr').onclick = () => {
-    const points = d.vals.map((v, i) => (parseInt(v, 10) || 0) * (d.neg[i] ? -1 : 1));
-    if (editing) g.rounds[d.edit] = { points };
-    else g.rounds.push({ points });
-    touch(g); draft = null; renderSimple(g);
-  };
-  if ($('cancel')) $('cancel').onclick = () => { draft = null; renderSimple(g); };
-  document.querySelectorAll('[data-r]').forEach(tr => tr.onclick = () => {
-    const ri = +tr.dataset.r, pts = g.rounds[ri].points;
-    draft = { vals: pts.map(v => v ? String(Math.abs(v)) : ''), neg: pts.map(v => v < 0), edit: ri };
-    renderSimple(g); window.scrollTo(0, 0);
+}
+
+function paintBasic(g) {
+  const t = totals(g), l = leaders(g, t);
+  t.forEach((v, i) => {
+    const el = document.querySelector(`[data-tot="${i}"]`);
+    el.textContent = v;
+    el.parentElement.classList.toggle('lead', l.includes(i));
   });
+  const cur = g.grid.findIndex(row => row.some(v => v === ''));
+  document.querySelectorAll('.paper tbody tr').forEach((tr, i) => tr.classList.toggle('cur', i === cur));
 }
 
 /* ---------- Blob (paper style grid) ---------- */

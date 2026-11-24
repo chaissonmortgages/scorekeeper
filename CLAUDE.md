@@ -9,7 +9,7 @@ Personal card game scorekeeper, installed on a phone as a PWA. Not a product. Ke
 
 ## How the code is laid out
 - State lives in `localStorage` under key `scores.v1` as `{ games: [...] }`.
-- Simple game: `{ id, type: 'simple', name, players, rounds: [{ points: [...] }], lowWins, created, updated }`.
+- Basic game (type 'simple'): `{ id, type: 'simple', name, players, grid, lowWins, created, updated }` where `grid[round][player]` is a string ('' when empty). Paper style grid, one box per player per round, totals in the header. Always 10+ rows with an empty row at the bottom (`basicPad()`). Old `rounds` games migrate in `load()`.
 - Blob game: `{ id, type: 'blob', name, players, upAgain, cells, created, updated }` where `cells[round][player] = [bid, got]` as strings ('' when empty).
   Cards per round come from `blobSchedule()`, NT/T from `blobNT()`, scores from `blobPoints()` (Wizard scoring). Running totals are computed, never stored.
 - `totals()` handles both types.
@@ -20,7 +20,7 @@ Personal card game scorekeeper, installed on a phone as a PWA. Not a product. Ke
 ## Adding a new game type
 1. Add a button to the game type selector in `renderNew` and any settings it needs.
 2. Write `renderX(g)` and route to it from `renderGame`.
-3. Push rounds as `{ points: [...] }` plus whatever extra fields you want for history.
+3. Store entries as plain strings in a grid, like Basic and Blob, and compute totals rather than storing them.
 4. Don't change the saved data shape in a way that breaks old games. If you must, migrate in `load()`.
 
 ## Style rules
